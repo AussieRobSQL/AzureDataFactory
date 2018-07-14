@@ -1,0 +1,118 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "defaultValue": "Azure Data Factory",
+            "type": "String",
+            "metadata": "Data Factory Name"
+        },
+        "dynamicFilters_fileName": {
+            "defaultValue": "dynamicFilter.json",
+            "type": "String"
+        },
+        "dynamicFilters_folderPath": {
+            "type": "String"
+        },
+        "storageLinkedServiceName": {
+            "type": "String",
+            "metadata": "Storage Account for the dynamicFilters Dataset"
+        }
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "name": "[concat(parameters('factoryName'), '/DynamicFilterTest')]",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Get Dynamic Filter Sample Data",
+                        "description": "This will read the Source Dataset in the Settings tab.",
+                        "type": "Lookup",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "BlobSource",
+                                "recursive": true
+                            },
+                            "dataset": {
+                                "referenceName": "dynamicFilters_input",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "firstRowOnly": false
+                        }
+                    },
+                    {
+                        "name": "Dynamic Filter - Apply Filters",
+                        "description": "Apply the Dynamic Filters to the Output of the previous activity",
+                        "type": "Filter",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Dynamic Filter Sample Data",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Get Dynamic Filter Sample Data').output.value",
+                                "type": "Expression"
+                            },
+                            "condition": {
+                                "value": "@if(equals('equals',pipeline().parameters.filterCondition),if(equals(item().date,pipeline().parameters.filterDate),true,false),if(equals('greater',pipeline().parameters.filterCondition),if(greater(item().date,pipeline().parameters.filterDate),true,false),if(equals('greaterOrEquals',pipeline().parameters.filterCondition),if(greaterOrEquals(item().date,pipeline().parameters.filterDate),true,false),if(equals('less',pipeline().parameters.filterCondition),if(less(item().date,pipeline().parameters.filterDate),true,false),if(equals('lessOrEquals',pipeline().parameters.filterCondition),if(lessOrEquals(item().date,pipeline().parameters.filterDate),true,false),false)))))",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ],
+                "parameters": {
+                    "filterDate": {
+                        "type": "String",
+                        "defaultValue": "formatDateTime(trigger().startTime,'yyyy-MM-dd')"
+                    },
+                    "filterCondition": {
+                        "type": "String",
+                        "defaultValue": "equals"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/dynamicFilters_input')]"
+            ]
+        },
+        {
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "name": "[concat(parameters('factoryName'), '/dynamicFilters_input')]",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[parameters('storageLinkedServiceName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "type": "AzureBlob",
+                "typeProperties": {
+                    "format": {
+                        "type": "JsonFormat",
+                        "filePattern": "arrayOfObjects"
+                    },
+                    "fileName": "[parameters('dynamicFilters_fileName')]",
+                    "folderPath": "[parameters('dynamicFilters_folderPath')]"
+                }
+            }
+        }
+    ]
+}
