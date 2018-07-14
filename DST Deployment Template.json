@@ -1,0 +1,81 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "type": "string",
+            "metadata": "Data Factory Name",
+            "defaultValue": "Azure Data Factory"
+        },
+        "dstCheckURL": {
+            "type": "string",
+            "metadata": "URL for the DST Check function"
+        }
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('factoryName'), '/PL DST Adjustment')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2017-09-01-preview",
+            "properties": {
+                "description": "Pipeline to adjust trigger run time depending on DST status.",
+                "activities": [
+                    {
+                        "name": "Get DST Flag",
+                        "description": "Call Azure Function to check current DST status.",
+                        "type": "WebActivity",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "url": "[parameters('dstCheckURL')]",
+                            "method": "GET",
+                            "headers": {}
+                        }
+                    },
+                    {
+                        "name": "Check DST Flag",
+                        "description": "Check DST Flag and Delay 3600 Seconds (1 Hour) when FALSE",
+                        "type": "IfCondition",
+                        "dependsOn": [
+                            {
+                                "activity": "Get DST Flag",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "expression": {
+                                "value": "@activity('Get DST Flag').isDST",
+                                "type": "Expression"
+                            },
+                            "ifFalseActivities": [
+                                {
+                                    "name": "DST False",
+                                    "description": "DST False - Delay 3600 Seconds.",
+                                    "type": "Wait",
+                                    "dependsOn": [],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "waitTimeInSeconds": 3600
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "dependsOn": []
+        }
+    ]
+}
