@@ -1,0 +1,154 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "factoryName": {
+      "defaultValue": "Azure Data Factory",
+      "type": "String",
+      "metadata": "Data Factory Name"
+    }
+  },
+  "variables": {
+    "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('factoryName'), '/Variables')]",
+      "type": "Microsoft.DataFactory/factories/pipelines",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "activities": [
+          {
+            "name": "Set Current Date",
+            "type": "SetVariable",
+            "dependsOn": [],
+            "userProperties": [],
+            "typeProperties": {
+              "variableName": "currentDate",
+              "value": {
+                "value": "@formatDateTime(utcnow(),'yyyy-MM-dd')",
+                "type": "Expression"
+              }
+            }
+          },
+          {
+            "name": "Loop counter",
+            "type": "Until",
+            "dependsOn": [
+              {
+                "activity": "Set Current Date",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "userProperties": [],
+            "typeProperties": {
+              "expression": {
+                "value": "@equals(int(variables('counter')),3)",
+                "type": "Expression"
+              },
+              "activities": [
+                {
+                  "name": "Append Date to dateArray",
+                  "type": "AppendVariable",
+                  "dependsOn": [],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "dateArray",
+                    "value": {
+                      "value": "@formatDateTime(adddays(variables('currentDate'),int(variables('counter'))),'yyyy-MM-dd')",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                {
+                  "name": "Set counterTemp",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "Append Date to dateArray",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "counterTemp",
+                    "value": {
+                      "value": "@string(add(int(variables('counter')),1))",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                {
+                  "name": "Set counter",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "Set counterTemp",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "counter",
+                    "value": {
+                      "value": "@variables('counterTemp')",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "timeout": "7.00:00:00"
+            }
+          },
+          {
+            "name": "Show dateArray",
+            "type": "Filter",
+            "dependsOn": [
+              {
+                "activity": "Loop counter",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "userProperties": [],
+            "typeProperties": {
+              "items": {
+                "value": "@variables('dateArray')",
+                "type": "Expression"
+              },
+              "condition": {
+                "value": "@equals(1,1)",
+                "type": "Expression"
+              }
+            }
+          }
+        ],
+        "variables": {
+          "dateArray": {
+            "type": "Array"
+          },
+          "counter": {
+            "type": "String",
+            "defaultValue": "0"
+          },
+          "currentDate": {
+            "type": "String"
+          },
+          "counterTemp": {
+            "type": "String",
+            "defaultValue": "0"
+          }
+        },
+        "annotations": []
+      },
+      "dependsOn": []
+    }
+  ]
+}
